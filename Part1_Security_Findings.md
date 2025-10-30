@@ -64,3 +64,70 @@
 The foundation is solid, but several "AI-gen" safety shortcuts (DEV bypass, mock users, weak RBAC) present critical risks in a regulated fintech context. Prioritizing strict environment controls, robust multi-role enforcement, and data protection will accelerate your path to a compliant, production-ready launch.
 
 > *Prepared by Samir H. Senior Solution Architect.  
+
+---
+
+# Critical Infrastructure Critique & Recommendations
+
+Although this code review focuses on security and application-level risks, the platform currently misses several foundational elements of a modern, production-ready infrastructure. These gaps are critical—especially for a regulated fintech context:
+
+## 1. Lack of Containerization (Docker)
+- **Risk:** No Docker leads to inconsistent environments, deployment errors, and increased troubleshooting effort across local/staging/production.
+- **Recommendation:** Provide Dockerfiles and docker-compose setups for all major services (frontend, backend, edge functions) to ensure consistency, repeatability, and portability.
+
+## 2. No Infrastructure-as-Code (IaC)
+- **Risk:** Manual cloud/Supabase resource drift; Roles, RLS, buckets, and policies can't be versioned or peer reviewed.
+- **Recommendation:** Use Terraform, Pulumi, or another IaC tool to define all infrastructure and access controls as code.
+
+## 3. Lacking CI/CD Pipeline
+- **Risk:** Risk of human error when deploying; potential for dev/test code or secrets to be accidentally shipped to production.
+- **Recommendation:** Implement GitHub Actions (or similar) for gated, automated build, test, and deployment stages. Protect main/prod branches and automate secret/configuration management.
+
+## 4. No Secrets Management
+- **Risk:** API keys and sensitive credentials may be handled insecurely, e.g., in plaintext or exposed .env files.
+- **Recommendation:** Use secure secrets management (GitHub Actions Secrets, HashiCorp Vault, or Supabase secrets) for all environments.
+
+## 5. Environment Separation Missing
+- **Risk:** Environments (prod, staging, dev) are not strictly separated; increases risk of data leakage or config mix-up.
+- **Recommendation:** Fully separate configs and access levels per environment using proper deployment and feature toggling strategies.
+
+## 6. No Centralized Logging/Observability
+- **Risk:** No structure for logging, metrics, or alerting makes it difficult to handle incidents, performance analysis, or regulatory audits.
+- **Recommendation:** Integrate centralized logging (Datadog, Sentry, ELK, etc.), metrics, and real-time alerting.
+
+---
+
+## Summary/Action Plan
+- **Containerization**: Make Docker the baseline for both dev and prod.
+- **CI/CD**: All commits go through automated, reviewed pipelines.
+- **IaC**: All infra, policies, RBAC, and storage defined as code.
+- **Secrets Management**: No plaintext secrets in code or repos ever.
+- **Environment Separation**: Staging and prod never share data, users, or secrets.
+- **Observability**: All errors, activity, and security events are logged and monitored centrally.
+
+**Recommendation:** These improvements are non-negotiable for a compliant, scalable, and secure financial product. They should be prioritized alongside application security findings and can be delivered incrementally. Sample Dockerfiles, GitHub Actions workflows, and Terraform modules are available on request.
+
+## Public Cloud Migration Benefits (AWS/Azure/GCP; DigitalOcean as lean option)
+- **Enterprise-grade security & compliance**: Native services for KMS/HSM, IAM least-privilege, PrivateLink/VPC peering, managed WAF, Shield/DDoS, audit trails (CloudTrail/Activity Logs), with regional residency controls for UAE/GCC when available.
+- **Scalability & resilience**: Auto-scaling, multi-AZ/region HA patterns, managed DR/backup, blue/green and canary deployments, traffic shaping and safe rollbacks.
+- **Managed data platforms**: Fully managed Postgres, event streams (Kafka/PubSub/Event Hubs), data lakes/warehouses with lineage and governance for analytics and compliance reporting.
+- **Observability & operations**: Centralized logging/metrics/tracing (CloudWatch/Stackdriver/App Insights), native alerting, SLO/SLA tracking, and incident tooling integration.
+- **Zero-trust networking**: Private subnets, service meshes, mTLS, policy-as-code, and fine-grained network segmentation not feasible on simpler PaaS.
+- **Secret management & key rotation**: KMS/KeyVault/CloudKMS, Secrets Manager, automatic rotation, envelope encryption, and per-service IAM scoping.
+- **Stronger SDLC & platform engineering**: Native CI/CD, infra pipelines, artifact registries, SBOM/signing (SLSA), and policy gates for regulated change management.
+- **Cost governance & FinOps**: Budgets, anomaly detection, chargeback/showback, rightsizing recommendations, and lifecycle policies across environments.
+- **Ecosystem integrations**: Mature marketplace and partner solutions (fraud, AML, KYC, observability, security posture) that accelerate regulated fintech delivery.
+- **DigitalOcean (cost-lean option)**: Simpler managed Postgres/Kubernetes, predictable pricing; suitable for non-critical workloads or lower tiers, with the option to graduate to hyperscalers for core systems.
+
+## UAE PASS (BankID‑like) Integration Essentials
+- **Protocol & Flow**: Use OIDC Authorization Code + PKCE. Validate `id_token` (signature via JWKs, `iss`, `aud`, `exp`, `nonce`). Enforce exact redirect URIs.
+- **Assurance Tiers (Step‑up)**: Map UAE PASS LoA → `profiles.uae_pass_tier` (2/3). Require tier 3 for high‑risk actions (submission/disbursement). If user is tier 2, trigger step‑up with `acr_values` and verify `acr` claim on return.
+- **Identity Mapping**: Persist `uaepass_sub` (stable subject), `uae_pass_tier`, `verified_at`. Upsert `profiles` from UAE PASS claims (name, email, phone, Emirates ID). Do not accept FE‑provided identity attributes.
+- **Sessions & Cookies**: Server‑set, httpOnly, Secure, SameSite=strict cookies. Rotate refresh tokens after auth and step‑up. No tokens in localStorage/sessionStorage.
+- **RBAC & RLS**: Authorize actions using role + `uae_pass_tier`. Add RLS checks (e.g., tenants must be tier 3 to submit), and enforce on server/DB side in addition to FE `RouteGuard`.
+- **Edge Function Broker**:
+  - `POST /auth/uae-pass/start`: generate `state`, `nonce`, PKCE challenge; store server‑side; 302 to UAE PASS.
+  - `GET /auth/uae-pass/callback`: exchange code→tokens; validate `id_token`; upsert profile; create Supabase session; set cookie; redirect to app.
+- **Security Controls**: Replay protection (single‑use `state`/`code_verifier`), strict redirect matching, rate limiting, anomaly detection on auth failures.
+- **PII & Compliance**: Minimize stored attributes; encrypt Emirates ID at rest; redact from logs; audit log all auth events (start, success, failure, step‑up) with correlation IDs.
+- **Environments & Secrets**: Separate sandbox/prod clients and redirects; store client secrets in a secret manager; rotate regularly.
