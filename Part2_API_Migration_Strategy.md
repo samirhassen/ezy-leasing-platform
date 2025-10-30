@@ -141,4 +141,4 @@
 
 **This design hardens the cheque collection workflow from a mock system to full-production, auditable, and secure integration—ready for regulatory scrutiny and real-world scale.**
 
-> *Prepared by [Your Name], Senior Solution Architect.*
+> *Prepared by Samir H. Senior Solution Architect.*
